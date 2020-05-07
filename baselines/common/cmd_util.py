@@ -19,6 +19,46 @@ from baselines.common.vec_env.dummy_vec_env import DummyVecEnv
 from baselines.common import retro_wrappers
 from baselines.common.wrappers import ClipActionsWrapper
 
+import numpy as np
+
+class DoublePendWrapper():
+    def __init__(self, T_lim=130):
+        self.env = gym.make('InvertedDoublePendulum-v2').env
+        self.action_space = self.env.action_space
+        self.observation_space = gym.spaces.Box(-np.inf, np.inf, shape=(6,))
+        self.num_envs=1
+        self.reward_range = self.env.reward_range
+        self.seed = self.env.seed
+        self.metadata = self.env.metadata
+        self.spec = self.env.spec
+        self.T_lim = T_lim
+        self.t = 0
+
+    def state_trans(self, s):
+        a1 = np.arctan2(s[1], s[3])
+        a2 = np.arctan2(s[2], s[4])
+        s_new = np.hstack([s[0], a1, a2, s[5:-3]])
+        return s_new
+
+    def step(self, action):
+        ob, r, done, _ = self.env.step(action)
+        self.t += 1
+        if self.t >= self.T_lim: done = True
+        if np.abs(ob[0])> 0.90 or np.abs(ob[-3]) > 0.15 or  np.abs(ob[-2]) > 0.15 or np.abs(ob[-1]) > 0.15:
+            done = True
+        return self.state_trans(ob), r, done, {}
+
+    def reset(self):
+        ob =  self.env.reset()
+        self.t=0
+        return self.state_trans(ob)
+
+    def render(self):
+        self.env.render()
+
+
+
+
 def make_vec_env(env_id, env_type, num_env, seed,
                  wrapper_kwargs=None,
                  env_kwargs=None,
@@ -77,6 +117,8 @@ def make_env(env_id, env_type, mpi_rank=0, subrank=0, seed=None, reward_scale=1.
         import retro
         gamestate = gamestate or retro.State.DEFAULT
         env = retro_wrappers.make_retro(game=env_id, max_episode_steps=10000, use_restricted_actions=retro.Actions.DISCRETE, state=gamestate)
+    elif env_type == 'mujoco' and env_id == 'DoublePendWrapper':
+        env = DoublePendWrapper()
     else:
         env = gym.make(env_id, **env_kwargs)
 

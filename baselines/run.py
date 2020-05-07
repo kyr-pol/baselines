@@ -121,6 +121,9 @@ def build_env(args):
 def get_env_type(args):
     env_id = args.env
 
+    if env_id == 'DoublePendWrapper':
+        return 'mujoco', env_id
+
     if args.env_type is not None:
         return args.env_type, env_id
 
